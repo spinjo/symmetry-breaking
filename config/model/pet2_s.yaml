@@ -1,0 +1,34 @@
+# this config exactly matches the official OmniLearned structure,
+# see https://github.com/ViniciusMikuni/OmniLearned
+_target_: experiments.tagging.wrappers.PET2Wrapper
+in_channels: null
+out_channels: null
+use_amp: true
+
+net:
+ _target_: omnilearned.network.PET2
+ _partial_: true
+ input_dim: null
+ num_classes: null
+
+ use_int: true  # interaction features as attention bias
+
+ local_int: false  # don't use interaction features when constructing local features
+ K: 10
+ num_coord: 2  # use (delta_eta, delta_phi) in knn
+ int_type: lhc
+
+ conditional: false
+ pid: false  # we already embed PID manually
+ add_info: false  # we just append extra features to the kinematics
+ mode: classifier
+
+ base_dim: 128
+ num_transformers: 8
+ num_transformers_head: 2
+ num_tokens: 4
+ num_heads: 8
+ mlp_ratio: 2
+
+defaults:
+ - framesnet: identity

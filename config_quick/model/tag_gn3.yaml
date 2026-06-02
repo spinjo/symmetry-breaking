@@ -1,0 +1,60 @@
+_target_: experiments.tagging.wrappers.SaltWrapper
+in_channels: null
+out_channels: null
+use_amp: false
+zeropad: false
+compile: false
+global_object: &global_object jets # name of global variable
+
+net:
+  _target_: salt.models.SaltModel
+  init_nets:
+    - input_name: tracks
+      dense_config: &init
+        input_size: ${model.in_channels}
+        output_size: &embed_dim 32
+        hidden_layers: [128]
+        activation: &activation SiLU
+      variables:
+        - tracks: []
+        - *global_object : []
+      global_object: *global_object
+      attach_global: false
+
+  encoder:
+    _target_: salt.models.Transformer
+    num_layers: 2
+    embed_dim: *embed_dim
+    out_dim: &out_dim 32
+    attn_type: null
+    norm: RMSNorm
+    norm_type: hybrid
+    dense_kwargs:
+      activation: *activation
+      gated: True
+    attn_kwargs:
+      num_heads: 2
+    num_registers: 8
+
+  pool_net:
+    _target_: salt.models.GlobalAttentionPooling
+    input_size: *out_dim
+
+  tasks:
+    _target_: torch.nn.ModuleList
+    modules:
+      - _target_: salt.models.ClassificationTask
+        name: jets_classification # name of the task
+        input_name: *global_object
+        label: toptagging
+        class_names: [qcd]
+        use_class_dict: true
+        loss: torch.nn.CrossEntropyLoss # not used
+        dense_config: &task_dense_config
+          input_size: &pooled_dim 32
+          output_size: ${model.out_channels}
+          hidden_layers: [128, 64, 32]
+          activation: *activation
+
+defaults:
+  - framesnet: identity

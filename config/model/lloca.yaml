@@ -1,0 +1,35 @@
+_target_: experiments.tagging.wrappers.TransformerWrapper
+in_channels: null
+out_channels: null
+use_amp: false
+attention_backend: xformers
+mean_aggregation: false
+zeropad: false
+
+net:
+ _target_: lloca.backbone.transformer_v2.Transformer
+ _partial_: true
+ size: 0
+
+ in_channels: null
+ out_channels: null
+
+ attn_reps: "${model.net.helpers.s_channels}x0n+${model.net.helpers.v_channels}x1n"
+ num_heads: ${eval:'int(round(2 ** (3 + (${model.net.size} // 2))))'}
+ num_blocks: ${eval:'int(round(3 * 2 ** ((${model.net.size}+3)/2)))'}
+ helpers:
+  s_channels: ${eval:'int(round(2 ** (${model.net.size}+6)/${model.net.num_heads}))'}
+  v_channels: ${eval:'int(round(2 ** (${model.net.size}+4)/${model.net.num_heads}))'}
+
+ mlp_factor: 2
+ dropout_prob: null
+
+ checkpoint_blocks: false
+ compile: false
+
+framesnet:
+ equivectors:
+  hidden_channels: ${eval:'int(round(2 ** (${model.net.size}+5)))'}
+
+defaults:
+ - framesnet: learnedpd

@@ -1,0 +1,3 @@
+# project-specific
+salt-ml @ git+https://gitlab.cern.ch/lufavaro/salt.git@salt-lite
+omnilearned @ git+https://github.com/spinjo/OmniLearned@add-checkpointing

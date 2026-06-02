@@ -1,0 +1,17 @@
+# Training setup according to the GN3V01 configuration file adapted from the v0.12 Salt repository,
+# https://gitlab.cern.ch/aft/algorithms/salt/-/blob/main/salt/configs/GN3v01/GN3V01.yaml?ref_type=heads
+iterations: 200000
+batchsize: 128
+
+optimizer: Lion
+weight_decay: 1e-5
+
+# LR: Default CosineAnnealingLR
+lr: 1e-4
+scheduler: OneCycleLR
+onecycle_div_factor: 5000
+onecycle_final_div_factor: 1e-2
+onecycle_pct_start: 0.01
+
+defaults:
+ - tag_default

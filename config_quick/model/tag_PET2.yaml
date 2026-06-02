@@ -1,0 +1,32 @@
+_target_: experiments.tagging.wrappers.PET2Wrapper
+in_channels: null
+out_channels: null
+use_amp: false
+
+net:
+ _target_: omnilearned.network.PET2
+ _partial_: true
+ input_dim: null
+ num_classes: null
+
+ use_int: true
+ local_int: false
+ K: 10
+ num_coord: 2
+ int_type: lhc
+
+ conditional: false
+ pid: false
+ add_info: false
+ mode: classifier
+
+ base_dim: 32
+ num_transformers: 2
+ num_transformers_head: 1
+ num_tokens: 4
+ num_heads: 2
+ mlp_ratio: 2
+ checkpoint_blocks: false
+
+defaults:
+ - framesnet: identity

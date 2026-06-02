@@ -1,0 +1,29 @@
+exp_type: jetclass
+exp_name: jetclass_debug
+
+data:
+ data_dir: data/jetclass/
+ features: all
+
+ # miniweaver options
+ config: null
+ train_files_range: [0,1]
+ test_files_range: [100,101]
+ val_files_range: [120,121]
+ fraction_of_file: 1
+ num_workers: 2
+ fetch_step: 0.01
+ extra_selection: null
+ fetch_by_files: False
+ in_memory: False
+ not_remake_weights: False
+ steps_per_epoch: null
+ events_per_file: 1000
+ async_load: true
+
+evaluation:
+ eval_set: [test]
+
+defaults:
+ - tagging
+ - _self_

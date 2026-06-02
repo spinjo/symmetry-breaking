@@ -1,0 +1,77 @@
+_target_: experiments.tagging.wrappers.SaltWrapper
+in_channels: null
+out_channels: null
+use_amp: false
+zeropad: false
+compile: false
+compile_dynamic: true
+global_object: &global_object jets # name of global variable
+
+net:
+  _target_: salt.models.SaltModel
+
+  size: 0
+  helpers:
+    embed_dim: ${eval:'int(round(2 ** (${model.net.size}+7)))'}
+    num_heads: ${eval:'int(round(2 ** (3 + (${model.net.size} // 2))))'}
+    num_layers: ${eval:'int(round(3 * 2 ** ((${model.net.size}+3)/2)))'}
+    task_dims:
+      - ${eval:'int(round(2 ** (${model.net.size}+7)))'}
+      - ${eval:'int(round(2 ** (${model.net.size}+6)))'}
+      - ${eval:'int(round(2 ** (${model.net.size}+5)))'}
+
+  init_nets:
+    - input_name: tracks
+      dense_config:
+        input_size: ${model.in_channels}
+        output_size: ${model.net.helpers.embed_dim}
+        hidden_layers:
+          - ${model.net.helpers.embed_dim}
+        activation: &activation SiLU
+      variables:
+        - tracks: []
+        - *global_object : []
+      global_object: *global_object
+      attach_global: false
+
+  encoder:
+    _target_: salt.models.Transformer
+    num_layers: ${model.net.helpers.num_layers}
+    embed_dim: ${model.net.helpers.embed_dim}
+    out_dim: ${model.net.helpers.embed_dim}
+    attn_type: null
+    norm: RMSNorm
+    norm_type: hybrid
+    drop_registers: true
+    dense_kwargs:
+      activation: *activation
+      gated: True
+    attn_kwargs:
+      num_heads: ${model.net.helpers.num_heads}
+    num_registers: 8
+
+  pool_net:
+    _target_: salt.models.GlobalAttentionPooling
+    input_size: ${model.net.helpers.embed_dim}
+
+  tasks:
+    _target_: torch.nn.ModuleList
+    modules:
+      - _target_: salt.models.ClassificationTask
+        name: jets_classification # name of the task
+        input_name: *global_object
+        class_names: [qcd]
+        label: null
+        use_class_dict: true
+        loss: torch.nn.CrossEntropyLoss # not used
+        dense_config:
+          input_size: ${model.net.helpers.embed_dim}
+          output_size: ${model.out_channels}
+          hidden_layers:
+            - ${model.net.helpers.task_dims[0]}
+            - ${model.net.helpers.task_dims[1]}
+            - ${model.net.helpers.task_dims[2]}
+          activation: *activation
+
+defaults:
+  - framesnet: identity

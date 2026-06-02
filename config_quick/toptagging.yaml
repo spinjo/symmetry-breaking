@@ -1,0 +1,11 @@
+exp_type: toptagging
+exp_name: topt_local_debug
+
+data:
+ canonicalize: rest
+ data_dir : data
+ dataset: mini
+
+defaults:
+ - tagging
+ - _self_

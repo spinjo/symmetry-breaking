@@ -1,0 +1,41 @@
+# experiment management
+hydra-core
+pytest
+pre-commit>=3.7
+mlflow-skinny # can optionally install extras, see https://pypi.org/project/mlflow-skinny/
+
+# standard science stack
+numpy>=2.1.1
+matplotlib
+scikit-learn
+scipy
+
+# deep learning
+torch>=2.1.0
+torch-geometric>=2.4.0
+pytorch_optimizer>=3.2.0
+py-cpuinfo
+
+# attention backends (challenging to install)
+xformers # might have to fix version based on your pytorch version (otherwise xformers tries to reinstall pytorch); doesnt work on macOS
+flash-attn # needed for the Salt repo; install instructions in https://deepwiki.com/Dao-AILab/flash-attention/1.1-installation-and-setup
+ninja # for flash-attn
+packaging # for flash-attn
+einops # for flash-attn
+
+# project-specific
+pelican-lite
+lgatr[xformers-attention]>=1.4.2
+lloca[xformers-attention]>=1.3.4
+py-cpuinfo
+
+# weaver packages
+tqdm>=4.41.0
+PyYAML>=5.4
+awkward0>=0.15.5
+uproot>=5.4.0
+awkward>=2.6.8
+numba>=0.63.1
+pyarrow>=22.0.0
+lz4
+xxhash

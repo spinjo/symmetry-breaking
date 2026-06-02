@@ -1,0 +1,35 @@
+selection: null
+   ### use `&`, `|`, `~` for logical operations on numpy arrays
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+
+new_variables:
+   ### [format] name: formula
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+   training_weights: np.ones_like(label_isQCD)
+
+inputs:
+   pf_vectors:
+      length: 128
+      pad_mode: constant
+      vars:
+         ### rescale by 1.e-3: MeV → GeV
+         - [fjet_clus_E,  0, 1.e-3]
+         - [fjet_clus_px, 0, 1.e-3]
+         - [fjet_clus_py, 0, 1.e-3]
+         - [fjet_clus_pz, 0, 1.e-3]
+
+   ev_weights:
+      length: 1
+      pad_mode: constant
+      vars:
+         - [training_weights, null]
+
+labels:
+   ### type can be `simple`, `custom`
+   ### [option 1] use `simple` for binary/multi-class classification, then `value` is a list of 0-1 labels
+   type: simple
+   value: [label_isQCD, label_isTop]
+   ### [option 2] otherwise use `custom` to define the label, then `value` is a map
+   # type: custom
+   # value:
+   #    truth_label: label.argmax(1)

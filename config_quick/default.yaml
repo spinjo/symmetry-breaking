@@ -1,0 +1,34 @@
+exp_name: ???
+exp_type: ???
+run_name: null
+base_dir: .
+
+gpu: true  # false forces CPU. World size is set by torchrun.
+jobid: null
+seed: null
+debug: false
+use_float64: false
+float32_matmul_precision: highest
+autocast_bfloat16: true
+
+warm_start_idx: null
+save: false
+use_mlflow: false
+save_source: true
+
+train: true
+evaluate: true
+evaluation:
+ batchsize: ${eval:'4*${training.batchsize}'}
+
+plot: true
+plotting:
+ loss: true
+
+mlflow:
+ db: '${base_dir}/runs/${exp_name}/mlflow/mlflow.db'
+ artifacts: '${base_dir}/runs/${exp_name}/mlflow/artifacts'
+
+defaults:
+ - hydra
+ - _self_

@@ -1,0 +1,5 @@
+batchsize: 128
+iterations: 1300000
+
+defaults:
+ - jc

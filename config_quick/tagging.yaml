@@ -1,0 +1,27 @@
+data:
+ tagging_features: all
+ canonicalize: beam_eta
+ canonicalize_spurions: true
+ beam_reference: all
+ two_beams: true
+ add_time_reference: true
+ mass_reg: 5e-3  # only used in lloca
+ spurion_scale: 1
+ units: 1
+ max_particles: null
+ momentum_float64: true
+
+evaluation:
+ save_roc: false
+ eval_set: [train, test, val]
+
+plotting:
+ loss: true
+ roc: false
+ score: false
+
+defaults:
+ - training: default
+ - model: tag_transformer
+ - default
+ - _self_

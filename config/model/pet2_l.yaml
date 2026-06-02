@@ -1,0 +1,7 @@
+net:
+ base_dim: 1024
+ num_transformers: 28
+ num_heads: 32
+
+defaults:
+ - pet2_s

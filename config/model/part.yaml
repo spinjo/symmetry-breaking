@@ -1,0 +1,46 @@
+_target_: experiments.tagging.wrappers.ParTWrapper
+in_channels: null
+out_channels: null
+use_amp: true
+zeropad: true
+
+net:
+ _target_: lloca.backbone.particletransformer.ParticleTransformer
+ _partial_: true
+ size: 0
+
+ input_dim: null
+ num_classes: null
+
+ attn_reps: "${model.net.helpers.s_channels}x0n+${model.net.helpers.v_channels}x1n"
+ num_heads: ${eval:'int(round(2 ** (3 + (${model.net.size} // 2))))'}
+ pair_embed_dims:
+  - ${model.net.helpers.pair_dim}
+  - ${model.net.helpers.pair_dim}
+  - ${model.net.helpers.pair_dim}
+ num_layers: ${eval:'int(round(3 * 2 ** ((${model.net.size}+3)/2)-${model.net.num_cls_layers}))'}
+ num_cls_layers: ${eval:'2 if ${model.net.size} >= 0 else 1'}
+ helpers:
+  s_channels: ${eval:'int(round(2 ** (${model.net.size}+6)/${model.net.num_heads}))'}
+  v_channels: ${eval:'int(round(2 ** (${model.net.size}+4)/${model.net.num_heads}))'}
+  hidden_dims: ${eval:'int(round(2 ** (${model.net.size}+7)))'}
+  pair_dim: ${eval:'int(round(2 ** (${model.net.size}+6)))'}
+
+ ffn_ratio: 2
+ embed_dims: []
+ use_amp: ${model.use_amp}
+ trim: false
+
+ use_pre_activation_pair: false
+ pair_input_dim: 4
+ cls_block_params:
+  dropout: 0
+  attn_dropout: 0
+  activation_dropout: 0
+ version: 2
+
+ checkpoint_blocks: false
+ compile: false
+
+defaults:
+ - framesnet: identity

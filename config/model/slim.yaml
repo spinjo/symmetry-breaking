@@ -1,0 +1,35 @@
+_target_: experiments.tagging.wrappers.LGATrSlimWrapper
+mean_aggregation: false
+out_channels: null
+use_amp: false
+attention_backend: xformers
+units: null
+zeropad: false
+rescale: false
+
+net:
+ _target_: lgatr.nets.lgatr_slim.LGATrSlim
+ _partial_: true
+ size: 0
+
+ in_v_channels: 1
+ in_s_channels: null
+ out_v_channels: 0
+ out_s_channels: null
+
+ hidden_v_channels: ${eval:'int(round(2 ** (${model.net.size}+5)))'}
+ hidden_s_channels: ${eval:'int(round(2 ** (${model.net.size}+7)))'}
+ num_blocks: ${eval:'int(round(3 * 2 ** ((${model.net.size}+3)/2)))'}
+ num_heads: ${eval:'int(round(2 ** (3 + (${model.net.size} // 2))))'}
+
+ nonlinearity: gelu
+ nonlinearity_v: sigmoid
+
+ mlp_ratio: 2
+ attn_ratio: 1
+
+ checkpoint_blocks: false
+ compile: true
+
+defaults:
+ - framesnet: identity

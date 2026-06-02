@@ -1,0 +1,18 @@
+# mup scaling for lr
+# note: have to manually set training.lr=... for models that do not implement model.net.size
+lr: ${eval:'${training.lr_base} * 2 ** (-${model.net.size})'}
+lr_base: 2.5e-4
+
+weight_decay: 1e-2  # empirically worked best for all model sizes, and also when doing only one epoch
+
+batchsize: 512
+iterations: 1000000
+scheduler: OneCycleLR
+onecycle_pct_start: 0.1
+optimizer: AdamW
+clip_grad_norm: null
+
+validate_every_n_steps: 100000
+
+defaults:
+ - tag_default
