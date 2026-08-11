@@ -1,3 +1,5 @@
+import functools
+
 import torch
 from lloca.utils.polar_decomposition import restframe_boost
 from lloca.utils.utils import get_batch_from_ptr
@@ -14,7 +16,7 @@ from experiments.hep import (
 EPS = 1e-5
 
 # weaver defaults for tagging features standardization (mean, std)
-TAGGING_FEATURES_PREPROCESSING = [
+AUXILIARY_SCALARS_PREPROCESSING = [
     [1.7, 0.7],  # log_pt
     [2.0, 0.7],  # log_energy
     [-4.7, 0.7],  # log_pt_rel
@@ -34,19 +36,20 @@ def embed_tagging_data(fourmomenta, scalars, cfg_data):
     Parameters
     ----------
     fourmomenta: torch.tensor of shape (batchsize, n_particles, 4)
-        Fourmomenta in the format (E, px, py, pz)
+        Four-momenta in the format (E, px, py, pz)
     scalars: torch.tensor of shape (batchsize, n_particles, n_features)
         Optional scalar features, n_features=0 is possible
     cfg_data: settings for embedding
 
     Returns
     -------
-    fourmomenta: torch.Tensor
-        Fourmomenta with spurions included, shape (batchsize, n_particles + n_spurions, 4)
+    vectors: torch.Tensor
+        Lorentz vectors with spurions included, shape (batchsize, n_particles + n_spurions, C, 4) with
+        channel 0 the four-momentum. C=1 normally.
     scalars: torch.Tensor
         Scalar features with spurions included, shape (batchsize, n_particles + n_spurions, n_features)
-    tagging_features: torch.Tensor
-        Precomputed tagging features, shape (batchsize, n_particles + n_spurions, n_tagging_features)
+    auxiliary_scalars: torch.Tensor
+        Precomputed tagging features, shape (batchsize, n_particles + n_spurions, n_auxiliary_scalars)
     is_spurion: torch.BoolTensor
         Boolean mask with 'True' in spurion positions, shape (batchsize, n_particles + n_spurions)
     mask: torch.BoolTensor
@@ -65,7 +68,7 @@ def embed_tagging_data(fourmomenta, scalars, cfg_data):
         fourmomenta.device,
         fourmomenta.dtype,
     )
-    spurions *= cfg_data.spurion_scale
+    spurions = spurions * cfg_data.spurion_scale
     n_spurions = spurions.shape[0]
 
     spurions = spurions.unsqueeze(0).repeat(fourmomenta.shape[0], 1, 1)
@@ -83,59 +86,65 @@ def embed_tagging_data(fourmomenta, scalars, cfg_data):
     is_spurion[:, :n_spurions] = True
 
     mask = (fourmomenta.abs() > EPS).any(dim=-1)
-    max_size = mask.sum(dim=-1).max()
+    max_size = int(mask.sum(dim=-1).max())
     fourmomenta = fourmomenta[:, :max_size]
     scalars = scalars[:, :max_size]
     is_spurion = is_spurion[:, :max_size]
     mask = mask[:, :max_size]
 
+    vectors = fourmomenta.unsqueeze(2)
+
+    # construct canonicalization based on momenta, then apply to all Lorentz vectors
     if cfg_data.canonicalize in ["beam_eta", "beam_y"]:
         # apply boost in z direction and rotation around z direction to set eta_jet=phi_jet=0
         # can use either rapidity ('y') or pseudo rapidity ('eta')
         # transformation also applied to spurions, therefore it does not violate Lorentz equivariance
-        jet = fourmomenta[:, n_spurions:].sum(dim=1, keepdim=True)
-        phi_jet = get_phi(jet)
-        eta_jet = get_eta(jet) if cfg_data.canonicalize == "beam_eta" else get_rapidity(jet)
-        ptphietam2 = EPPP_to_PtPhiEtaM2(fourmomenta)
+        jet = vectors[:, n_spurions:, 0].sum(dim=1, keepdim=True)
+        phi_jet = get_phi(jet).unsqueeze(-1)
+        eta_jet = (
+            get_eta(jet) if cfg_data.canonicalize == "beam_eta" else get_rapidity(jet)
+        ).unsqueeze(-1)
+        ptphietam2 = EPPP_to_PtPhiEtaM2(vectors)
         if cfg_data.canonicalize_spurions:
             ptphietam2[..., 1] -= phi_jet
             ptphietam2[..., 2] -= eta_jet
-            fourmomenta = PtPhiEtaM2_to_EPPP(ptphietam2)
+            vectors = PtPhiEtaM2_to_EPPP(ptphietam2)
         else:
             # canonicalize only the constituents: the EPPP<->PtPhiEtaM2 round-trip is lossy for
             # light-like beam spurions (pt=0 -> eta clamps to CUTOFF)
-            ptphietam2[..., n_spurions:, 1] -= phi_jet
-            ptphietam2[..., n_spurions:, 2] -= eta_jet
-            fourmomenta[..., n_spurions:, :] = PtPhiEtaM2_to_EPPP(ptphietam2[..., n_spurions:, :])
+            ptphietam2[:, n_spurions:, :, 1] -= phi_jet
+            ptphietam2[:, n_spurions:, :, 2] -= eta_jet
+            vectors[:, n_spurions:] = PtPhiEtaM2_to_EPPP(ptphietam2[:, n_spurions:])
     elif cfg_data.canonicalize == "rest":
         # boost to the jet rest frame to avoid large boosts
-        jet = fourmomenta[:, n_spurions:].sum(dim=1, keepdim=True)
-        jet_boost = restframe_boost(jet)
+        jet = vectors[:, n_spurions:, 0].sum(dim=1, keepdim=True)
+        jet_boost = restframe_boost(jet).unsqueeze(2)
         if cfg_data.canonicalize_spurions:
-            fourmomenta = torch.einsum("...jk,...k->...j", jet_boost, fourmomenta)
+            vectors = torch.einsum("...jk,...k->...j", jet_boost, vectors)
         else:
-            fourmomenta[..., n_spurions:, :] = torch.einsum(
-                "...jk,...k->...j", jet_boost, fourmomenta[..., n_spurions:, :]
+            vectors[:, n_spurions:] = torch.einsum(
+                "...jk,...k->...j", jet_boost, vectors[:, n_spurions:]
             )
     elif cfg_data.canonicalize is None:
         pass
     else:
         raise ValueError(f"canonicalize option {cfg_data.canonicalize} not implemented")
-    fourmomenta[~mask] = 0.0
+    vectors[~mask] = 0.0
     scalars[~mask] = 0.0
 
     # precompute tagging features
-    jet = fourmomenta[:, n_spurions:].sum(dim=1, keepdim=True)
-    tagging_features = get_tagging_features(
-        fourmomenta,
+    momentum = vectors[..., 0, :]
+    jet = momentum[:, n_spurions:].sum(dim=1, keepdim=True)
+    auxiliary_scalars = get_auxiliary_scalars(
+        momentum,
         jet,
-        tagging_features=cfg_data.tagging_features,
+        auxiliary_scalars=cfg_data.auxiliary_scalars,
     )
-    tagging_features[:, :n_spurions] = 0.0
-    tagging_features[~mask] = 0.0
-    tagging_features = tagging_features.to(scalars.dtype)
+    auxiliary_scalars[:, :n_spurions] = 0.0
+    auxiliary_scalars[~mask] = 0.0
+    auxiliary_scalars = auxiliary_scalars.to(scalars.dtype)
 
-    return [fourmomenta, scalars, tagging_features, is_spurion, mask]
+    return [vectors, scalars, auxiliary_scalars, is_spurion, mask]
 
 
 def dense_to_sparse(dense_tensors, mask):
@@ -145,15 +154,16 @@ def dense_to_sparse(dense_tensors, mask):
     num_particles = mask.sum(dim=-1)
     ptr = torch.zeros(len(num_particles) + 1, device=device, dtype=torch.long)
     ptr[1:] = torch.cumsum(num_particles, dim=0)
-    batch = get_batch_from_ptr(ptr)
+    idxs = mask.flatten().nonzero().squeeze(-1)
+    batch = get_batch_from_ptr(ptr, num_items=idxs.shape[0])
 
     sparse_tensors = []
     for dense_tensor in dense_tensors:
         if dense_tensor.numel() > 0:
-            sparse_tensor = dense_tensor[mask]
+            sparse_tensor = dense_tensor.flatten(0, 1).index_select(0, idxs)
         else:
             sparse_tensor = torch.zeros(
-                mask.sum(),
+                idxs.shape[0],
                 *dense_tensor.shape[2:],
                 device=dense_tensor.device,
                 dtype=dense_tensor.dtype,
@@ -162,6 +172,7 @@ def dense_to_sparse(dense_tensors, mask):
     return sparse_tensors, batch, ptr
 
 
+@functools.cache
 def get_spurion(
     beam_reference,
     add_time_reference,
@@ -170,7 +181,7 @@ def get_spurion(
     dtype,
 ):
     """
-    Construct spurion
+    Construct spurion. Cached, so callers must not mutate the returned tensor.
 
     Parameters
     ----------
@@ -229,7 +240,7 @@ def get_spurion(
     return spurion
 
 
-def get_tagging_features(fourmomenta, jet, tagging_features="all", eps=1e-10):
+def get_auxiliary_scalars(fourmomenta, jet, auxiliary_scalars="all", eps=1e-10):
     """
     Compute features typically used in jet tagging
 
@@ -239,7 +250,7 @@ def get_tagging_features(fourmomenta, jet, tagging_features="all", eps=1e-10):
         Fourmomenta in the format (E, px, py, pz)
     jet: torch.tensor of shape (n_particles, 4)
         Jet momenta in the shape (E, px, py, pz)
-    tagging_features: str
+    auxiliary_scalars: str
         Type of tagging features to include. Options are None, 'all', 'zinvariant', 'so3invariant'.
         Note that all features are SO(2)-invariant.
     eps: float
@@ -271,35 +282,35 @@ def get_tagging_features(fourmomenta, jet, tagging_features="all", eps=1e-10):
         dr,
     ]
     for i, feature in enumerate(features):
-        mean, factor = TAGGING_FEATURES_PREPROCESSING[i]
+        mean, factor = AUXILIARY_SCALARS_PREPROCESSING[i]
         features[i] = (feature - mean) * factor
-    if tagging_features == "zinvariant":
+    if auxiliary_scalars == "zinvariant":
         # exclude energy, because it is not invariant under z-boosts
         idx = [0, 2, 4, 5, 6]
-    elif tagging_features == "so3invariant":
+    elif auxiliary_scalars == "so3invariant":
         # exclude everything except energy, because it is not invariant under SO(3) rotations
         idx = [1, 3]
-    elif tagging_features is None:
+    elif auxiliary_scalars is None:
         return torch.zeros(
             *features[0].shape[:-1], 0, device=fourmomenta.device, dtype=fourmomenta.dtype
         )
-    elif tagging_features == "all":
+    elif auxiliary_scalars == "all":
         idx = list(range(len(features)))
     else:
-        raise ValueError(f"tagging_features={tagging_features} not implemented")
+        raise ValueError(f"auxiliary_scalars={auxiliary_scalars} not implemented")
     features = [features[i] for i in idx]
     features = torch.cat(features, dim=-1)
     return features
 
 
-def get_num_tagging_features(tagging_features="all"):
-    if tagging_features == "all":
+def get_num_auxiliary_scalars(auxiliary_scalars="all"):
+    if auxiliary_scalars == "all":
         return 7
-    elif tagging_features == "zinvariant":
+    elif auxiliary_scalars == "zinvariant":
         return 5
-    elif tagging_features == "so3invariant":
+    elif auxiliary_scalars == "so3invariant":
         return 2
-    elif tagging_features is None:
+    elif auxiliary_scalars is None:
         return 0
     else:
-        raise ValueError(f"tagging_features={tagging_features} not implemented")
+        raise ValueError(f"auxiliary_scalars={auxiliary_scalars} not implemented")

@@ -1,6 +1,6 @@
 net:
  primitives:
-  sparse: true
+  sparse_linear: true
 
 defaults:
  - lgatr

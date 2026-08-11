@@ -4,7 +4,7 @@ import copy
 import numpy as np
 import awkward as ak
 
-from .eval_utils import _get_variable_names, _eval_expr
+from .eval_utils import _get_data_var_names, _eval_expr
 from .fileio import _read_files
 from .config import _strcat
 
@@ -15,7 +15,7 @@ def _apply_selection(table, selection, funcs=None):
     if funcs:
         new_vars = {
             k: funcs[k]
-            for k in _get_variable_names(selection)
+            for k in _get_data_var_names(selection)
             if k not in table.fields and k in funcs
         }
         _build_new_variables(table, new_vars)
@@ -100,14 +100,14 @@ class AutoStandardizer(object):
                 keep_branches.add(k)
                 load_branches.add(k)
         if self._data_config.selection:
-            load_branches.update(_get_variable_names(self._data_config.selection))
+            load_branches.update(_get_data_var_names(self._data_config.selection))
 
         func_vars = set(self._data_config.var_funcs.keys())
         while load_branches & func_vars:
             for k in load_branches & func_vars:
                 aux_branches.add(k)
                 load_branches.remove(k)
-                load_branches.update(_get_variable_names(self._data_config.var_funcs[k]))
+                load_branches.update(_get_data_var_names(self._data_config.var_funcs[k]))
 
         table = _read_files(
             filelist,
@@ -185,14 +185,14 @@ class WeightMaker(object):
         aux_branches = set()
         load_branches = keep_branches.copy()
         if self._data_config.selection:
-            load_branches.update(_get_variable_names(self._data_config.selection))
+            load_branches.update(_get_data_var_names(self._data_config.selection))
 
         func_vars = set(self._data_config.var_funcs.keys())
         while load_branches & func_vars:
             for k in load_branches & func_vars:
                 aux_branches.add(k)
                 load_branches.remove(k)
-                load_branches.update(_get_variable_names(self._data_config.var_funcs[k]))
+                load_branches.update(_get_data_var_names(self._data_config.var_funcs[k]))
 
         table = _read_files(
             filelist,

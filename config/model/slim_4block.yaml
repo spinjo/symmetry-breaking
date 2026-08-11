@@ -1,0 +1,8 @@
+net:
+ hidden_v_channels: ${eval:'int(round(3 * 2 ** (${model.net.size}+4)))'}
+ hidden_s_channels: ${eval:'int(round(12 * 2 ** (${model.net.size}+4)))'}
+ num_blocks: 4
+ num_heads: ${eval:'max(1, int(round(${model.net.hidden_s_channels}/64)))'}
+
+defaults:
+ - slim

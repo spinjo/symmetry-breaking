@@ -5,10 +5,9 @@ use_amp: false
 attention_backend: xformers
 units: null
 zeropad: false
-rescale: false
 
 net:
- _target_: lgatr.nets.lgatr_slim.LGATrSlim
+ _target_: lgatr.nets.slim.LGATrSlim
  _partial_: true
 
  in_v_channels: 1
@@ -24,7 +23,11 @@ net:
  attn_ratio: 1
 
  checkpoint_blocks: false
+ naive_amp: false
  compile: true
+ compile_kwargs:
+  dynamic: true
+  mode: default
 
 defaults:
  - framesnet: identity

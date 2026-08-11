@@ -28,19 +28,22 @@ net:
 
  ffn_ratio: 2
  embed_dims: []
- use_amp: ${model.use_amp}
  trim: false
 
  use_pre_activation_pair: false
+ normalize_input: true
  pair_input_dim: 4
  cls_block_params:
   dropout: 0
   attn_dropout: 0
   activation_dropout: 0
- version: 2
+ version: 3
 
  checkpoint_blocks: false
- compile: false
+ compile: true
+ compile_kwargs:
+  dynamic: true
+  mode: default
 
 defaults:
  - framesnet: identity

@@ -1,0 +1,7 @@
+net:
+ attn_reps: "32x0n+8x1n"
+ num_heads: ${eval:'max(1, int(round(3 * 2 ** ${model.net.size})))'}
+ num_blocks: 4
+
+defaults:
+ - lloca

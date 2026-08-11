@@ -20,6 +20,9 @@ net:
 
  checkpoint_blocks: false
  compile: false
+ compile_kwargs:
+  dynamic: true
+  mode: default
 
 defaults:
  - framesnet: identity

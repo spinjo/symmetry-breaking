@@ -3,7 +3,7 @@
 _target_: experiments.tagging.wrappers.PET2Wrapper
 in_channels: null
 out_channels: null
-use_amp: true
+use_amp: false
 
 net:
  _target_: omnilearned.network.PET2

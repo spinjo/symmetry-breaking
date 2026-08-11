@@ -1,0 +1,9 @@
+net:
+ hidden_mv_channels: ${eval:'int(round(3 * 2 ** (${model.net.size}+3)))'}
+ hidden_s_channels: ${eval:'int(round(18 * 2 ** (${model.net.size}+3)))'}
+ num_blocks: 4
+ attention:
+  num_heads: ${eval:'max(1, int(round(${model.net.hidden_s_channels}/64)))'}
+
+defaults:
+ - lgatr
