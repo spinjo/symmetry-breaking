@@ -29,6 +29,7 @@ net:
     attn_type: null
     norm: RMSNorm
     norm_type: hybrid
+    drop_registers: true
     dense_kwargs:
       activation: *activation
       gated: True
@@ -48,8 +49,7 @@ net:
         input_name: *global_object
         label: toptagging
         class_names: [qcd]
-        use_class_dict: true
-        loss: torch.nn.CrossEntropyLoss # not used
+        loss: torch.nn.CrossEntropyLoss # not used (loss computed by the experiment)
         dense_config: &task_dense_config
           input_size: &pooled_dim 32
           output_size: ${model.out_channels}

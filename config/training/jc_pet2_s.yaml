@@ -1,9 +1,0 @@
-# JetClass training schedule optimized to work well with PET2-S (AUC=0.98661, accuracy=0.8539)
-# Choices for scheduler and optimizer are agnostic, and lr was then optimized for these settings
-# Also tried the 'PET2-S defaults' (optimizer=Lion, betas=[0.95,0.98], lr=5e-5), but they gave worse results (AUC=0.98637, accuracy=0.8524)
-lr: 1e-3
-scheduler: CosineAnnealingLR
-optimizer: AdamW
-
-defaults:
- - jc_ParT

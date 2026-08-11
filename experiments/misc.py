@@ -78,6 +78,8 @@ def get_attention_mask(
     batch: torch.Tensor,
     attention_backend: str,
     dtype: torch.dtype,
+    ptr: torch.Tensor = None,
+    maxlen: int = None,
 ):
     """Returns the attention mask according to the backend.
 
@@ -89,6 +91,12 @@ def get_attention_mask(
         Attention backend to use ("xformers", "flex", or "flash").
     dtype : torch.dtype
         Data type of the attention mask (for xformers backend).
+    ptr : torch.Tensor, optional
+        Cumulative sequence lengths, i.e. cu_seqlens. Passing it avoids a
+        bincount over batch (flash/varlen backends only).
+    maxlen : int, optional
+        Maximum sequence length, or an upper bound for it. Passing it avoids
+        a device-to-host sync (flash/varlen backends only).
 
     Returns
     -------
@@ -104,12 +112,17 @@ def get_attention_mask(
             # fallback to default attention
             return {"attn_mask": mask}
     elif attention_backend in ["flash", "varlen"]:
-        seqlens = torch.bincount(batch).to(torch.int32)
-        maxlen = int(seqlens.max().item())
-        cu_seqlens = torch.cumsum(seqlens, dim=0, dtype=torch.int32)
-        cu_seqlens = torch.cat(
-            [torch.tensor([0], dtype=torch.int32, device=seqlens.device), cu_seqlens], dim=0
-        )
+        if ptr is not None:
+            cu_seqlens = ptr.to(torch.int32)
+        else:
+            seqlens = torch.bincount(batch).to(torch.int32)
+            cu_seqlens = torch.cumsum(seqlens, dim=0, dtype=torch.int32)
+            cu_seqlens = torch.cat(
+                [torch.tensor([0], dtype=torch.int32, device=seqlens.device), cu_seqlens],
+                dim=0,
+            )
+        if maxlen is None:
+            maxlen = int((cu_seqlens[1:] - cu_seqlens[:-1]).max().item())
         if not on_cpu:
             if attention_backend == "flash":
                 return {

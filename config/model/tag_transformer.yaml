@@ -20,7 +20,10 @@ net:
  dropout_prob: null
 
  checkpoint_blocks: false
- compile: false
+ compile: true
+ compile_kwargs:
+  dynamic: true
+  mode: default
 
 defaults:
  - framesnet: identity

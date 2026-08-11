@@ -1,0 +1,46 @@
+selection: ak.any(tracks_valid, axis=-1) & ak.all((tracks_E < 10000000) | ~np.isfinite(tracks_E), axis=-1)
+   ### use `&`, `|`, `~` for logical operations on numpy arrays
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+
+new_variables:
+   ### [format] name: formula
+   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+   label_isLight: (jets_HadronConeExclTruthLabelID == 0)
+   label_isCharm: (jets_HadronConeExclTruthLabelID == 4)
+   label_isBottom: (jets_HadronConeExclTruthLabelID == 5)
+   label_isTau: (jets_HadronConeExclTruthLabelID == 15)
+   tracks_dR: np.hypot(tracks_deta, tracks_dphi)
+
+inputs:
+   # tracks_* (mean, 1/std) from gitlab.cern.ch/atlas/open-data/transforming-jet-flavor
+   pf_features:
+      length: 40
+      pad_mode: constant
+      vars:
+         - [tracks_lifetimeSignedD0Significance, 1.8, 0.12]
+         - [tracks_lifetimeSignedZ0SinThetaSignificance, 0.84, 0.11]
+         - [tracks_d0, -8.4e-4, 1.8]
+         - [tracks_z0SinTheta, 2.2e-4, 0.87]
+         - [tracks_ptfrac, 0.0782, 9.86]
+         - [tracks_dR, 0.15, 9.67]
+   pf_vectors:
+      length: 40
+      pad_mode: constant
+      vars:
+         ### rescale by 1.e-3: MeV → GeV
+         - [tracks_E,  0, 1.e-3]
+         - [tracks_px, 0, 1.e-3]
+         - [tracks_py, 0, 1.e-3]
+         - [tracks_pz, 0, 1.e-3]
+
+labels:
+   ### type can be `simple`, `custom`
+   ### [option 1] use `simple` for binary/multi-class classification, then `value` is a list of 0-1 labels
+   type: simple
+   value: [label_isLight, label_isCharm, label_isBottom, label_isTau]
+   ### [option 2] otherwise use `custom` to define the label, then `value` is a map
+   # type: custom
+   # value:
+   #    truth_label: label.argmax(1)
+
+weights:

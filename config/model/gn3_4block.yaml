@@ -1,0 +1,12 @@
+net:
+ helpers:
+  embed_dim: ${eval:'int(round(3 * 2 ** (${model.net.size}+6)))'}
+  num_heads: ${eval:'max(1, int(round(${model.net.helpers.embed_dim}/64)))'}
+  num_layers: 4
+  task_dims:
+   - ${model.net.helpers.embed_dim}
+   - ${eval:'int(round(${model.net.helpers.embed_dim}/2))'}
+   - ${eval:'int(round(${model.net.helpers.embed_dim}/4))'}
+
+defaults:
+ - gn3

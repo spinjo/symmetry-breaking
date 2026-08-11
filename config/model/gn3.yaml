@@ -1,7 +1,7 @@
 _target_: experiments.tagging.wrappers.SaltWrapper
 in_channels: null
 out_channels: null
-use_amp: false
+use_amp: true
 zeropad: false
 compile: false
 compile_dynamic: true
@@ -62,8 +62,7 @@ net:
         input_name: *global_object
         class_names: [qcd]
         label: null
-        use_class_dict: true
-        loss: torch.nn.CrossEntropyLoss # not used
+        loss: torch.nn.CrossEntropyLoss # not used (loss computed by the experiment)
         dense_config:
           input_size: ${model.net.helpers.embed_dim}
           output_size: ${model.out_channels}

@@ -5,7 +5,6 @@ use_amp: false
 attention_backend: xformers
 units: null
 zeropad: false
-rescale: false
 
 net:
  _target_: lgatr.LGATr
@@ -18,25 +17,30 @@ net:
  out_s_channels: null
 
  hidden_mv_channels: ${eval:'int(round(2 ** (${model.net.size}+4)))'}
- hidden_s_channels: ${eval:'int(round(2 ** (${model.net.size}+6)))'}
+ hidden_s_channels: ${eval:'int(round(3 * 2 ** (${model.net.size}+5)))'}
  num_blocks: ${eval:'int(round(3 * 2 ** ((${model.net.size}+3)/2)))'}
 
  attention:
   num_heads: ${eval:'int(round(2 ** (3 + (${model.net.size} // 2))))'}
   multi_query: false
-  increase_hidden_channels: 1
+  attn_ratio: 1
   head_scale: false
  mlp:
-  activation: gelu
-  increase_hidden_channels: 2
+  nonlinearity: gelu
+  mlp_ratio: 2
  primitives:
-  sparse: false
+  sparse_gp: true
+  sparse_linear: false
   bivector: true
   geometric_product: true
   subgroup: true
 
  checkpoint_blocks: false
+ naive_amp: false
  compile: true
+ compile_kwargs:
+  dynamic: true
+  mode: default
 
 defaults:
   - framesnet: identity

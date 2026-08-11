@@ -59,8 +59,15 @@ def _get_content_and_offsets(a):
     """Extract flat content and offsets from a 1-level jagged awkward array. Returns None if not applicable."""
     try:
         layout = a.layout
-        # unwrap wrappers that don't have offsets (e.g. VirtualArray, IndexedArray)
+        # IndexedArray reorders/filters its content (e.g., after `table[selected]`),
+        # so naively unwrapping it would yield the underlying array's offsets and silently
+        # drop the index. Materialize via ak.to_packed to get a true ListOffsetArray.
+        if isinstance(layout, (ak.contents.IndexedArray, ak.contents.IndexedOptionArray)):
+            layout = ak.to_packed(a).layout
+        # unwrap remaining wrappers that don't have offsets (e.g. VirtualArray)
         while not hasattr(layout, "offsets"):
+            if isinstance(layout, (ak.contents.IndexedArray, ak.contents.IndexedOptionArray)):
+                return None
             if hasattr(layout, "content"):
                 layout = layout.content
             else:
@@ -113,14 +120,17 @@ def _repeat_pad(a, maxlen, dtype="float64"):
         _repeat_pad_jagged_kernel(content.astype(dtype), offsets, out)
         return out
     # fallback for complex layouts
-    padded = _pad(a, maxlen, value=0, dtype=dtype)
-    for idx in range(len(a)):
-        row_len = len(a[idx])
-        if row_len == 0:
+    counts = np.asarray(ak.num(a))
+    nrows = len(counts)
+    out = np.zeros((nrows, maxlen), dtype=dtype)
+    idx = np.arange(maxlen)
+    for i in range(nrows):
+        n = int(counts[i])
+        if n == 0:
             continue
-        for j in range(row_len, maxlen):
-            padded[idx, j] = padded[idx, j % row_len]
-    return padded
+        row = np.asarray(a[i], dtype=dtype)
+        out[i] = row[idx % n]
+    return out
 
 
 def _clip(a, a_min, a_max):
@@ -173,53 +183,6 @@ def _batch_permute_and_drop_indices(array, random_permute=True, drop_rate_min=0,
         counts = ak.values_astype(counts, "int64")
         indices = indices[indices < counts]
     return indices
-
-
-@numba.njit(cache=True)
-def _fused_repeat_pad_one_var(content, offsets, center, scale, lo, hi, do_center, out_v):
-    """Standardize + clip + repeat-pad + nan_to_num for one variable, writing into a 2D slice (nrows, maxlen)."""
-    nrows = len(offsets) - 1
-    maxlen = out_v.shape[1]
-    for i in range(nrows):
-        row_start = offsets[i]
-        row_len = offsets[i + 1] - row_start
-        if row_len == 0:
-            continue
-        for j in range(maxlen):
-            val = np.float64(content[row_start + j % row_len])
-            if do_center:
-                val = (val - center) * scale
-                if val < lo:
-                    val = lo
-                elif val > hi:
-                    val = hi
-            if val != val:
-                val = np.float64(0.0)
-            out_v[i, j] = val
-
-
-@numba.njit(cache=True)
-def _fused_constant_pad_one_var(content, offsets, center, scale, lo, hi, do_center, pad_value, out_v):
-    """Standardize + clip + constant-pad + nan_to_num for one variable, writing into a 2D slice (nrows, maxlen)."""
-    nrows = len(offsets) - 1
-    maxlen = out_v.shape[1]
-    for i in range(nrows):
-        row_start = offsets[i]
-        row_len = offsets[i + 1] - row_start
-        n = min(row_len, maxlen)
-        for j in range(n, maxlen):
-            out_v[i, j] = pad_value
-        for j in range(n):
-            val = np.float64(content[row_start + j])
-            if do_center:
-                val = (val - center) * scale
-                if val < lo:
-                    val = lo
-                elif val > hi:
-                    val = hi
-            if val != val:
-                val = np.float64(0.0)
-            out_v[i, j] = val
 
 
 @numba.njit(cache=True)

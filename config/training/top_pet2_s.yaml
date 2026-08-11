@@ -1,0 +1,17 @@
+# OmniLearned from-scratch top tagging hyperparameters, from
+# https://github.com/ViniciusMikuni/OmniLearned/blob/main/train.sh
+# 'omnilearned train --dataset top --epoch 15 --lr 5e-4 --size small --wd 0.5 --interaction'
+# with the default batchsize of 64, i.e. 15 epochs over the 1.211M top tagging jets
+batchsize: 64
+iterations: 283828
+validate_every_n_steps: 18922 # after each epoch
+
+optimizer: Lion
+betas: [0.95, 0.98]
+weight_decay: 0.5
+
+lr: 5e-4
+scheduler: CosineAnnealingLR
+
+defaults:
+ - tag_default

@@ -11,7 +11,7 @@ FONTSIZE_TICK = 12
 colors = ["black", "#0343DE", "#A52A2A", "darkorange"]
 
 
-def plot_mixer(cfg, plot_path, title, plot_dict):
+def plot_mixer_training(cfg, plot_path, plot_dict):
     if cfg.plotting.loss and cfg.train:
         file = f"{plot_path}/training.pdf"
         with PdfPages(file) as out:
@@ -70,6 +70,8 @@ def plot_mixer(cfg, plot_path, title, plot_dict):
                     key,
                 )
 
+
+def plot_mixer(cfg, plot_path, title, plot_dict):
     if cfg.plotting.score and cfg.evaluate:
         file = f"{plot_path}/score.pdf"
         with PdfPages(file) as out:

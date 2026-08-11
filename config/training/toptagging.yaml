@@ -1,0 +1,13 @@
+# transformer settings optimized by us
+iterations: 200000
+batchsize: 128
+
+weight_decay: 1
+optimizer: Lion
+scheduler: CosineAnnealingLR
+
+lr: ${eval:'${training.lr_base} * 2 ** (-${oc.select:model.net.size,0})'}
+lr_base: 5e-5
+
+defaults:
+ - tag_default

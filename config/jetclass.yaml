@@ -19,7 +19,7 @@ data:
  not_remake_weights: False
  steps_per_epoch: null
  events_per_file: 100000
- async_load: true
+ async_load: false
 
 evaluation:
  eval_set: [test]

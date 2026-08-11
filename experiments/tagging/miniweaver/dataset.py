@@ -284,11 +284,11 @@ class _SimpleIter(object):
         # determine the load files and their ranges for each iteration
         if self._fetch_by_files:
             self.load_filelist_and_ranges = [
-                (
-                    self.filelist[i : i + self._fetch_step],
-                    [self.load_range] * self._fetch_step,
+                (files, [self.load_range] * len(files))
+                for files in (
+                    self.filelist[i : i + self._fetch_step]
+                    for i in range(0, len(self.filelist), self._fetch_step)
                 )
-                for i in range(0, len(self.filelist), self._fetch_step)
             ]
         else:
             self.load_filelist_and_ranges = []
@@ -393,9 +393,7 @@ class _SimpleIter(object):
         if end_of_list:
             if init:
                 raise RuntimeError(
-                    "Nothing to load for worker %d" % 0
-                    if self.worker_info is None
-                    else self.worker_info.id
+                    "Nothing to load for worker %d" % (0 if self.worker_info is None else self.worker_info.id)
                 )
             if self._infinity_mode and not self._in_memory:
                 # infinity mode: re-start
@@ -482,7 +480,7 @@ class SimpleIterDataset(torch.utils.data.IterableDataset):
         self._init_file_dict = file_dict
         self._init_load_range_and_fraction = load_range_and_fraction
         self._fetch_by_files = fetch_by_files
-        self._fetch_step = fetch_step
+        self._fetch_step = int(fetch_step) if fetch_by_files else fetch_step
         self._file_fraction = file_fraction
         self._async_load = async_load
         self._infinity_mode = infinity_mode

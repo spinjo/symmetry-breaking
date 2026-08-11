@@ -1,0 +1,30 @@
+exp_type: jetset
+exp_name: jetset
+
+data:
+ data_dir: data/jetset
+ features: all
+ tanh_scalars: true
+
+ # miniweaver options
+ config: null
+ train_files_range: [0, 1]
+ test_files_range: [0, 1]
+ val_files_range: [0, 1]
+ fraction_of_file: 1
+ num_workers: 2
+ fetch_step: 5
+ extra_selection: null
+ fetch_by_files: true
+ in_memory: False
+ not_remake_weights: False
+ steps_per_epoch: null
+ events_per_file: 100000
+ async_load: true
+
+evaluation:
+ eval_set: [test]
+
+defaults:
+ - tagging
+ - _self_

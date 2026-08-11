@@ -5,7 +5,6 @@ fix_params: false
 gamma_max: null
 gamma_hardness: 10
 deterministic_boost: null
-compile: false
 mass_reg: null
 ortho_kwargs:
  use_float64: true

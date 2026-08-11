@@ -1,4 +1,5 @@
 import math
+import os
 import awkward as ak
 import tqdm
 from .tools import _concat
@@ -121,12 +122,9 @@ def _read_files(
     file_magic=None,
     **kwargs,
 ):
-    import os
-
     branches = list(branches)
     table = []
-    if show_progressbar:
-        filelist = tqdm.tqdm(filelist)
+    iterable = tqdm.tqdm(filelist) if show_progressbar else filelist
 
     # check `load_ranges`:
     #  - None: load all entries for all files
@@ -141,7 +139,7 @@ def _read_files(
             load_ranges = (load_ranges,) * len(filelist)
     assert all(r is None or (len(r) == 2 and 0 <= r[0] < r[1] <= 1) for r in load_ranges)
 
-    for filepath, load_range in zip(filelist, load_ranges):
+    for filepath, load_range in zip(iterable, load_ranges):
         if load_range is not None and load_range[0] >= load_range[1]:
             continue
         ext = os.path.splitext(filepath)[1]
@@ -193,5 +191,5 @@ def _write_root(file, table, treename="Events", compression=-1, step=1048576):
         tree = fout.mktree(treename, {k: table[k].type for k in table.fields})
         start = 0
         while start < len(table[table.fields[0]]) - 1:
-            tree.extend({k: table[k][start: start + step] for k in table.fields})
+            tree.extend({k: table[k][start : start + step] for k in table.fields})
             start += step

@@ -1,6 +1,7 @@
 net:
  base_dim: 1024
  num_transformers: 28
+ num_transformers_head: 4
  num_heads: 32
 
 defaults:

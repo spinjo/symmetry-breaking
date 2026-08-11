@@ -97,6 +97,9 @@ class BaseExperiment:
             self.train()
             self._save_model()
 
+        if self.cfg.plot and self.cfg.train and self.cfg.save:
+            self.plot_training()
+
         if self.cfg.evaluate:
             self.evaluate()
 
@@ -168,8 +171,8 @@ class BaseExperiment:
                 device_ids=[self.local_rank] if cuda else None,
                 output_device=self.local_rank if cuda else None,
                 broadcast_buffers=False,
-                static_graph=True,
                 gradient_as_bucket_view=True,
+                static_graph=True,
             )
 
     def _init(self):
@@ -345,10 +348,10 @@ class BaseExperiment:
         )
         LOGGER.info(f"Using device {self.device}; world_size={self.world_size}")
         self.dtype = torch.float64 if self.cfg.use_float64 else torch.float32
+        autocast_dtype = torch.bfloat16 if self.cfg.autocast_bfloat16 else torch.float16
         if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
-            torch.set_autocast_gpu_dtype(
-                torch.bfloat16 if self.cfg.autocast_bfloat16 else torch.float16
-            )
+            torch.set_autocast_gpu_dtype(autocast_dtype)
+        torch.set_autocast_cpu_dtype(autocast_dtype)
         LOGGER.debug(f"Using dtype {self.dtype}")
 
         torch.set_float32_matmul_precision(self.cfg.float32_matmul_precision)
@@ -697,14 +700,18 @@ class BaseExperiment:
         self.scaler.unscale_(self.optimizer)  # unscale before clipping
 
         if self.cfg.training.log_grad_norm:
-            grad_norm_frames = (
-                torch.nn.utils.clip_grad_norm_(
-                    self._model.framesnet.parameters(),
-                    float("inf"),
+            frames_params = list(self._model.framesnet.parameters())
+            if len(frames_params) > 0:
+                grad_norm_frames = (
+                    torch.nn.utils.clip_grad_norm_(
+                        frames_params,
+                        float("inf"),
+                    )
+                    .detach()
+                    .to(self.device)
                 )
-                .detach()
-                .to(self.device)
-            )
+            else:
+                grad_norm_frames = torch.zeros((), device=self.device)
             grad_norm_net = (
                 torch.nn.utils.clip_grad_norm_(
                     self._model.net.parameters(),
@@ -744,11 +751,17 @@ class BaseExperiment:
                 self.cfg.training.clip_grad_norm_framesnet,
             )
 
+        global_grad_norm = grad_norm.detach().clone()
+        if self.world_size > 1:
+            dist.all_reduce(global_grad_norm, op=dist.ReduceOp.MAX)
+
+        if not torch.isfinite(global_grad_norm):
+            LOGGER.warning(
+                f"Skipping iteration {step}, gradient norm is non-finite ({global_grad_norm})"
+            )
+            return
+
         if step > MIN_STEP_SKIP and self.cfg.training.max_grad_norm is not None:
-            # max-reduce so all ranks make the same skip decision (else DDP desyncs)
-            global_grad_norm = grad_norm.detach().clone()
-            if self.world_size > 1:
-                dist.all_reduce(global_grad_norm, op=dist.ReduceOp.MAX)
             if global_grad_norm > self.cfg.training.max_grad_norm:
                 LOGGER.warning(
                     f"Skipping iteration {step}, gradient norm {global_grad_norm} exceeds maximum {self.cfg.training.max_grad_norm}"
@@ -764,41 +777,41 @@ class BaseExperiment:
         ]:
             self.scheduler.step()
 
-        if not torch.isfinite(loss):
-            LOGGER.warning(f"Loss is nonfinite (loss={loss}) at iteration {step}")
-
-        loss_logged = loss.detach().clone()
+        loss_logged = loss.detach().float()
         all_reduce_mean_(loss_logged)
-        self.train_loss.append(loss_logged.item())
+        self.train_loss.append(loss_logged)
         self.train_lr.append(self.optimizer.param_groups[0]["lr"])
         self.grad_norm_train.append(grad_norm)
         self.grad_norm_frames.append(grad_norm_frames)
         self.grad_norm_net.append(grad_norm_net)
         for key in list(metrics.keys()):
-            value = metrics[key].detach().clone()
+            value = metrics[key].detach().float()
             all_reduce_mean_(value)
-            metrics[key] = value.cpu().item()
-            self.train_metrics[key].append(metrics[key])
+            self.train_metrics[key].append(value)
 
-        # log to mlflow
         if (
-            self.cfg.use_mlflow
-            and self.cfg.training.log_every_n_steps != 0
+            self.cfg.training.log_every_n_steps != 0
             and step % self.cfg.training.log_every_n_steps == 0
         ):
-            log_dict = {
-                "loss": loss_logged.item(),
-                "lr": self.train_lr[-1],
-                "time_per_step": (time.time() - self.training_start_time_corrected) / (step + 1),
-                "grad_norm": grad_norm,
-                "grad_norm_frames": grad_norm_frames,
-                "grad_norm_net": grad_norm_net,
-            }
-            for key, values in log_dict.items():
-                log_mlflow(f"train.{key}", values, step=step)
+            if not torch.isfinite(loss_logged):
+                LOGGER.warning(f"Loss is nonfinite (loss={loss_logged}) at iteration {step}")
 
-            for key, values in metrics.items():
-                log_mlflow(f"train.{key}", values, step=step)
+            # log to mlflow
+            if self.cfg.use_mlflow:
+                log_dict = {
+                    "loss": loss_logged.item(),
+                    "lr": self.train_lr[-1],
+                    "time_per_step": (time.time() - self.training_start_time_corrected)
+                    / (step + 1),
+                    "grad_norm": grad_norm,
+                    "grad_norm_frames": grad_norm_frames,
+                    "grad_norm_net": grad_norm_net,
+                }
+                for key, values in log_dict.items():
+                    log_mlflow(f"train.{key}", values, step=step)
+
+                for key in metrics:
+                    log_mlflow(f"train.{key}", self.train_metrics[key][-1].item(), step=step)
 
     def _save_config(self, filename, to_mlflow=False):
         # Save config
@@ -836,6 +849,9 @@ class BaseExperiment:
         raise NotImplementedError()
 
     def init_data(self):
+        raise NotImplementedError()
+
+    def plot_training(self):
         raise NotImplementedError()
 
     def evaluate(self):

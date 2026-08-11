@@ -82,8 +82,6 @@ class ATLASTopExperiment(BinaryTaggingExperiment):
                 "val": "experiments/tagging/miniweaver/configs_atlastop/fourmomenta.yaml",
                 "test": "experiments/tagging/miniweaver/configs_atlastop/fourmomenta_test.yaml",
                 "syst": "experiments/tagging/miniweaver/configs_atlastop/fourmomenta_noweights.yaml",
-                "onlyqcd": "experiments/tagging/miniweaver/configs_atlastop/fourmomenta_onlyqcd.yaml",
-                "onlytop": "experiments/tagging/miniweaver/configs_atlastop/fourmomenta_onlytop.yaml",
             }
         else:
             raise ValueError(f"Input feature option {self.cfg.data.features} not implemented")
@@ -160,35 +158,6 @@ class ATLASTopExperiment(BinaryTaggingExperiment):
                     infinity_mode=self.cfg.data.steps_per_epoch is not None,
                     in_memory=self.cfg.data.in_memory,
                     name=syst,
-                    events_per_file=self.cfg.data.events_per_file,
-                    async_load=self.cfg.data.async_load,
-                )
-
-            additional_datasets = ["onlyqcd", "onlytop"]
-            for label in additional_datasets:
-                path = os.path.join(self.cfg.data.data_dir, "test_nominal")
-                flist = [
-                    f"{label}:{path}/test_nominal_{str(i).zfill(3)}.root"
-                    for i in range(*files_range["test"])
-                ]
-                self.num_files[label] = len(flist)
-                file_dict, _ = to_filelist(flist)
-                file_dict = {n: f[self.rank :: self.world_size] for n, f in file_dict.items()}
-
-                LOGGER.info(f"Using {len(flist)} files for dataset {label} from {path}")
-                self.syst_datasets[label] = SimpleIterDataset(
-                    file_dict,
-                    self.cfg.data.config[label],
-                    for_training=False,
-                    extra_selection=self.cfg.data.extra_selection,
-                    remake_weights=not self.cfg.data.not_remake_weights,
-                    load_range_and_fraction=((0, 1), 1, 1),
-                    file_fraction=1,
-                    fetch_by_files=self.cfg.data.fetch_by_files,
-                    fetch_step=self.cfg.data.fetch_step,
-                    infinity_mode=self.cfg.data.steps_per_epoch is not None,
-                    in_memory=self.cfg.data.in_memory,
-                    name=label,
                     events_per_file=self.cfg.data.events_per_file,
                     async_load=self.cfg.data.async_load,
                 )
@@ -313,6 +282,17 @@ class ATLASTopExperiment(BinaryTaggingExperiment):
         if not self.is_master:
             return
 
+        test_result = self.results["test"]
+        is_top = test_result["labels_true"] > 0.5
+        self.results["onlytop"] = {
+            "labels_true": test_result["labels_true"][is_top],
+            "labels_predict": test_result["labels_predict"][is_top],
+        }
+        self.results["onlyqcd"] = {
+            "labels_true": test_result["labels_true"][~is_top],
+            "labels_predict": test_result["labels_predict"][~is_top],
+        }
+
         # alt-sample-only systs are class-incomplete; append nominal opposite-class jets
         for syst_name in ATLAS_BKG_ONLY_SYSTS:
             if syst_name in self.results and "onlytop" in self.results:
@@ -404,6 +384,15 @@ class ATLASTopExperiment(BinaryTaggingExperiment):
                     leaf_uncs["unc_bkg_FSR"],
                 ),
             }
+            group_uncs["unc_exp"] = _safe_quad(
+                group_uncs["unc_cluster"],
+                group_uncs["unc_track"],
+            )
+            group_uncs["unc_theory"] = _safe_quad(
+                leaf_uncs["unc_sig_model"],
+                group_uncs["unc_bkg_model"],
+                group_uncs["unc_scale"],
+            )
             unc_total = _safe_quad(
                 group_uncs["unc_cluster"],
                 group_uncs["unc_track"],

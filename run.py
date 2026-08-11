@@ -9,6 +9,7 @@ import torch.multiprocessing as mp
 from experiments.tagging.atlastopexperiment import ATLASTopExperiment
 from experiments.tagging.experiment import TopTaggingExperiment
 from experiments.tagging.jetclassexperiment import JetClassTaggingExperiment
+from experiments.tagging.jetsetexperiment import JetSetTaggingExperiment
 from experiments.tagging.toptagxlexperiment import TopTagXLExperiment
 
 EXPERIMENTS = {
@@ -16,6 +17,7 @@ EXPERIMENTS = {
     "toptagxl": TopTagXLExperiment,
     "jetclass": JetClassTaggingExperiment,
     "atlastop": ATLASTopExperiment,
+    "jetset": JetSetTaggingExperiment,
 }
 
 
